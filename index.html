@@ -1,0 +1,93 @@
+
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aktualna cena Bitcoina</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #FF9900;
+        }
+        .price {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .satoshi {
+            font-size: 1.2em;
+            text-align: center;
+            margin-top: 20px;
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 0.8em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Aktualna cena Bitcoina</h1>
+        <div class="price">
+            <p>Bitcoin (BTC) w USD: <span id="btc-usd">Ładowanie...</span></p>
+            <p>Bitcoin (BTC) w PLN: <span id="btc-pln">Ładowanie...</span></p>
+        </div>
+        <div class="satoshi">
+            <p>1 USD to <span id="satoshi-usd">Ładowanie...</span> satoshi</p>
+            <p>1 PLN to <span id="satoshi-pln">Ładowanie...</span> satoshi</p>
+        </div>
+    </div>
+
+    <footer>
+        <p>Źródło danych: CoinGecko API</p>
+    </footer>
+
+    <script>
+        const API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,pln';
+
+        async function fetchBitcoinPrices() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+
+                const btcUsd = data.bitcoin.usd;
+                const btcPln = data.bitcoin.pln;
+
+                document.getElementById('btc-usd').textContent = btcUsd.toFixed(2) + ' USD';
+                document.getElementById('btc-pln').textContent = btcPln.toFixed(2) + ' PLN';
+
+                // Przeliczanie satoshi na USD i PLN
+                const satoshiPerBitcoin = 100000000; // 1 BTC = 100 mln satoshi
+                const satoshiUsd = satoshiPerBitcoin / btcUsd;
+                const satoshiPln = satoshiPerBitcoin / btcPln;
+
+                document.getElementById('satoshi-usd').textContent = satoshiUsd.toFixed(0);
+                document.getElementById('satoshi-pln').textContent = satoshiPln.toFixed(0);
+
+            } catch (error) {
+                console.error('Błąd podczas pobierania danych:', error);
+            }
+        }
+
+        fetchBitcoinPrices();
+        setInterval(fetchBitcoinPrices, 20000); // Odświeżaj co 20 sekund
+    </script>
+</body>
+</html>
