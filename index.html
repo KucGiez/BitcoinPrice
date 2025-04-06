@@ -1,93 +1,1305 @@
-
 <!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aktualna cena Bitcoina</title>
+    <title>Bitcoin Weather - Strona Startowa</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
     <style>
+        :root {
+            --bitcoin-orange: #F7931A;
+            --bitcoin-orange-light: #ffa94d;
+            --apple-bg: rgba(255, 255, 255, 0.8);
+            --apple-bg-dark: rgba(30, 30, 30, 0.8);
+            --apple-card: rgba(255, 255, 255, 0.7);
+            --apple-text: #1d1d1f;
+            --apple-text-secondary: #6e6e73;
+            --apple-border: rgba(0, 0, 0, 0.1);
+            --apple-success: #36B37E;
+            --apple-danger: #FF5630;
+            --blur-strength: 15px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --apple-bg: rgba(30, 30, 30, 0.8);
+                --apple-bg-dark: rgba(0, 0, 0, 0.8);
+                --apple-card: rgba(60, 60, 60, 0.7);
+                --apple-text: #f5f5f7;
+                --apple-text-secondary: #a1a1a6;
+                --apple-border: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            color: #333;
+            width: 100%;
+            height: 100vh;
+            overflow-x: hidden;
+            color: var(--apple-text);
+            background-color: #f5f5f7;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #000000;
+            }
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .glassmorphism {
+            backdrop-filter: blur(var(--blur-strength));
+            -webkit-backdrop-filter: blur(var(--blur-strength));
+            background-color: var(--apple-card);
+            border-radius: 16px;
+            border: 1px solid var(--apple-border);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 16px;
+            background-color: var(--apple-bg);
+            backdrop-filter: blur(var(--blur-strength));
+            -webkit-backdrop-filter: blur(var(--blur-strength));
+            border-bottom: 1px solid var(--apple-border);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: space-between;
+        }
+
+        .bitcoin-price {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bitcoin-logo {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            background-color: var(--bitcoin-orange);
+            border-radius: 50%;
+            font-weight: bold;
+        }
+
+        .price-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .current-price {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .price-change {
+            font-size: 0.875rem;
+            color: var(--apple-text-secondary);
+        }
+
+        .up {
+            color: var(--apple-success);
+        }
+
+        .down {
+            color: var(--apple-danger);
+        }
+
+        .stats-cards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .stat-card {
+            padding: 12px 16px;
+            min-width: 140px;
+        }
+
+        .stat-title {
+            font-size: 0.75rem;
+            color: var(--apple-text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: calc(100vh - 250px);
+            min-height: 400px;
             padding: 20px;
         }
-        .container {
-            max-width: 600px;
-            margin: auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+
+        .search-container {
+            width: 100%;
+            max-width: 650px;
+            margin: 0 auto;
+            padding: 24px;
+            z-index: 10;
         }
-        h1 {
-            text-align: center;
-            color: #FF9900;
+
+        .search-form {
+            display: flex;
+            width: 100%;
+            position: relative;
         }
-        .price {
-            font-size: 1.5em;
-            margin-bottom: 20px;
-            text-align: center;
+
+        .search-input {
+            width: 100%;
+            padding: 16px 56px 16px 24px;
+            font-size: 1.125rem;
+            border-radius: 24px;
+            border: none;
+            background-color: var(--apple-card);
+            color: var(--apple-text);
+            outline: none;
+            transition: all 0.3s ease;
+            -webkit-appearance: none;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-        .satoshi {
-            font-size: 1.2em;
-            text-align: center;
-            margin-top: 20px;
+
+        .search-input:focus {
+            box-shadow: 0 0 0 2px var(--bitcoin-orange);
         }
-        footer {
+
+        .search-button {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--bitcoin-orange);
+        }
+
+        .search-button svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .weather-description {
             text-align: center;
-            margin-top: 40px;
-            font-size: 0.8em;
-            color: #666;
+            margin-top: 24px;
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--apple-text);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .news-section {
+            padding: 32px 16px;
+            background-color: var(--apple-bg);
+            border-top: 1px solid var(--apple-border);
+        }
+
+        .news-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .news-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .news-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .news-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .news-card {
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            height: 100%;
+            transition: transform 0.2s ease;
+        }
+
+        .news-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .news-source {
+            font-size: 0.75rem;
+            color: var(--apple-text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .news-card-title {
+            font-size: 1rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .news-card-description {
+            font-size: 0.875rem;
+            color: var(--apple-text-secondary);
+            flex-grow: 1;
+        }
+
+        .news-date {
+            font-size: 0.75rem;
+            color: var(--apple-text-secondary);
+            margin-top: 12px;
+            align-self: flex-end;
+        }
+
+        @media screen and (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .stats-cards {
+                justify-content: center;
+            }
+
+            .stat-card {
+                min-width: 120px;
+            }
+
+            main {
+                height: auto;
+                padding-top: 60px;
+                padding-bottom: 60px;
+            }
+
+            .news-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading animations */
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        /* Bitcoin icon animation */
+        @keyframes rotate {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(360deg); }
+        }
+
+        .bitcoin-logo {
+            perspective: 1000px;
+        }
+
+        .bitcoin-logo span {
+            display: inline-block;
+            animation: rotate 10s infinite linear;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Aktualna cena Bitcoina</h1>
-        <div class="price">
-            <p>Bitcoin (BTC) w USD: <span id="btc-usd">Ładowanie...</span></p>
-            <p>Bitcoin (BTC) w PLN: <span id="btc-pln">Ładowanie...</span></p>
-        </div>
-        <div class="satoshi">
-            <p>1 USD to <span id="satoshi-usd">Ładowanie...</span> satoshi</p>
-            <p>1 PLN to <span id="satoshi-pln">Ładowanie...</span> satoshi</p>
-        </div>
-    </div>
+    <div id="canvas-container"></div>
 
-    <footer>
-        <p>Źródło danych: CoinGecko API</p>
-    </footer>
+    <header>
+        <div class="header-content">
+            <div class="bitcoin-price">
+                <div class="bitcoin-logo">
+                    <span>₿</span>
+                </div>
+                <div class="price-info">
+                    <span class="current-price" id="btc-price">$0</span>
+                    <span class="price-change" id="btc-change">0.00%</span>
+                </div>
+            </div>
+            <div class="stats-cards">
+                <div class="stat-card glassmorphism">
+                    <div class="stat-title">24h Wolumen</div>
+                    <div class="stat-value" id="btc-volume">$0</div>
+                </div>
+                <div class="stat-card glassmorphism">
+                    <div class="stat-title">Opłata transakcyjna</div>
+                    <div class="stat-value" id="btc-fee">0 sat/vB</div>
+                </div>
+                <div class="stat-card glassmorphism">
+                    <div class="stat-title">Hash Rate</div>
+                    <div class="stat-value" id="btc-hashrate">0 EH/s</div>
+                </div>
+                <div class="stat-card glassmorphism">
+                    <div class="stat-title">Niepotwierdzonych</div>
+                    <div class="stat-value" id="btc-mempool">0 tx</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="search-container glassmorphism">
+            <form class="search-form" action="https://www.google.com/search" method="get">
+                <input type="text" name="q" class="search-input" placeholder="Wyszukaj w Google..." autocomplete="off">
+                <button type="submit" class="search-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
+            </form>
+        </div>
+        <div class="weather-description" id="weather-status">
+            Sprawdzanie statusu rynku Bitcoin...
+        </div>
+    </main>
+
+    <section class="news-section">
+        <div class="news-container">
+            <div class="news-header">
+                <h2 class="news-title">Najnowsze wiadomości z świata Bitcoin</h2>
+            </div>
+            <div class="news-cards" id="news-container">
+                <!-- Placeholder for news - will be populated by JS -->
+                <div class="news-card glassmorphism loading">
+                    <div class="news-source">Źródło wiadomości</div>
+                    <h3 class="news-card-title">Trwa ładowanie najnowszych wiadomości...</h3>
+                    <p class="news-card-description">Pobieranie aktualnych informacji z świata Bitcoin i kryptowalut.</p>
+                    <span class="news-date">Teraz</span>
+                </div>
+                <div class="news-card glassmorphism loading">
+                    <div class="news-source">Źródło wiadomości</div>
+                    <h3 class="news-card-title">Trwa ładowanie najnowszych wiadomości...</h3>
+                    <p class="news-card-description">Pobieranie aktualnych informacji z świata Bitcoin i kryptowalut.</p>
+                    <span class="news-date">Teraz</span>
+                </div>
+                <div class="news-card glassmorphism loading">
+                    <div class="news-source">Źródło wiadomości</div>
+                    <h3 class="news-card-title">Trwa ładowanie najnowszych wiadomości...</h3>
+                    <p class="news-card-description">Pobieranie aktualnych informacji z świata Bitcoin i kryptowalut.</p>
+                    <span class="news-date">Teraz</span>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <script>
-        const API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,pln';
-
-        async function fetchBitcoinPrices() {
-            try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
-
-                const btcUsd = data.bitcoin.usd;
-                const btcPln = data.bitcoin.pln;
-
-                document.getElementById('btc-usd').textContent = btcUsd.toFixed(2) + ' USD';
-                document.getElementById('btc-pln').textContent = btcPln.toFixed(2) + ' PLN';
-
-                // Przeliczanie satoshi na USD i PLN
-                const satoshiPerBitcoin = 100000000; // 1 BTC = 100 mln satoshi
-                const satoshiUsd = satoshiPerBitcoin / btcUsd;
-                const satoshiPln = satoshiPerBitcoin / btcPln;
-
-                document.getElementById('satoshi-usd').textContent = satoshiUsd.toFixed(0);
-                document.getElementById('satoshi-pln').textContent = satoshiPln.toFixed(0);
-
-            } catch (error) {
-                console.error('Błąd podczas pobierania danych:', error);
+        // ============= THREE.JS WEATHER VISUALIZATION =============
+        class BitcoinWeather {
+            constructor() {
+                this.container = document.getElementById('canvas-container');
+                this.weatherStatus = document.getElementById('weather-status');
+                
+                // Three.js setup
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.container.appendChild(this.renderer.domElement);
+                
+                // Camera positioning
+                this.camera.position.z = 30;
+                
+                // Light setup
+                this.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+                this.scene.add(this.ambientLight);
+                
+                this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+                this.directionalLight.position.set(0, 10, 5);
+                this.scene.add(this.directionalLight);
+                
+                // Weather objects containers
+                this.clouds = new THREE.Group();
+                this.raindrops = new THREE.Group();
+                this.sunrays = new THREE.Group();
+                this.lightnings = new THREE.Group();
+                
+                this.scene.add(this.clouds);
+                this.scene.add(this.raindrops);
+                this.scene.add(this.sunrays);
+                this.scene.add(this.lightnings);
+                
+                // Variables to track wind and visibility
+                this.windIntensity = 0;
+                this.visibilityFactor = 1;
+                
+                // Initialize market state
+                this.marketState = 'stable';
+                this.priceChangePercent = 0;
+                
+                // Setup resize listener
+                window.addEventListener('resize', this.onWindowResize.bind(this));
+                
+                // Start animation loop
+                this.animate();
+                
+                // Initialize weather on load
+                this.initializeWeather();
+            }
+            
+            // Create clouds for different weather states
+            createClouds(count, state) {
+                for (let i = 0; i < count; i++) {
+                    const cloudGeometry = new THREE.SphereGeometry(Math.random() * 2 + 1, 8, 8);
+                    
+                    let material;
+                    switch(state) {
+                        case 'sunny':
+                            material = new THREE.MeshStandardMaterial({
+                                color: 0xffffff,
+                                transparent: true,
+                                opacity: 0.3 + Math.random() * 0.2
+                            });
+                            break;
+                        case 'partly-cloudy':
+                            material = new THREE.MeshStandardMaterial({
+                                color: 0xeeeeee,
+                                transparent: true,
+                                opacity: 0.5 + Math.random() * 0.3
+                            });
+                            break;
+                        case 'cloudy':
+                            material = new THREE.MeshStandardMaterial({
+                                color: 0xdddddd,
+                                transparent: true,
+                                opacity: 0.7 + Math.random() * 0.3
+                            });
+                            break;
+                        case 'rainy':
+                        case 'stormy':
+                            material = new THREE.MeshStandardMaterial({
+                                color: 0x999999,
+                                transparent: true,
+                                opacity: 0.8 + Math.random() * 0.2
+                            });
+                            break;
+                        default:
+                            material = new THREE.MeshStandardMaterial({
+                                color: 0xeeeeee,
+                                transparent: true,
+                                opacity: 0.5
+                            });
+                    }
+                    
+                    const cloud = new THREE.Mesh(cloudGeometry, material);
+                    
+                    // Position clouds randomly in the sky
+                    cloud.position.x = Math.random() * 40 - 20;
+                    cloud.position.y = Math.random() * 10 + 5;
+                    cloud.position.z = Math.random() * 10 - 20;
+                    
+                    // Scale clouds for more natural look
+                    const scale = Math.random() * 1 + 1;
+                    cloud.scale.set(scale, scale * 0.6, scale * 0.7);
+                    
+                    // Store original position for wind animation
+                    cloud.userData.originalX = cloud.position.x;
+                    cloud.userData.speed = Math.random() * 0.05 + 0.01;
+                    
+                    this.clouds.add(cloud);
+                }
+            }
+            
+            // Create sun and rays for sunny weather
+            createSun(intensity) {
+                // Clear previous sun rays
+                while(this.sunrays.children.length > 0) {
+                    this.sunrays.remove(this.sunrays.children[0]);
+                }
+                
+                // Create a sun sphere
+                const sunGeometry = new THREE.SphereGeometry(5, 32, 32);
+                const sunMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffdd00,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+                sun.position.set(-15, 15, -10);
+                this.sunrays.add(sun);
+                
+                // Create sun rays
+                const rayCount = Math.floor(intensity * 12);
+                for (let i = 0; i < rayCount; i++) {
+                    const rayGeometry = new THREE.CylinderGeometry(0.1, 0.1, 8, 8);
+                    const rayMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xffcc00,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    
+                    const ray = new THREE.Mesh(rayGeometry, rayMaterial);
+                    
+                    // Position rays around the sun
+                    const angle = (i / rayCount) * Math.PI * 2;
+                    ray.position.x = sun.position.x;
+                    ray.position.y = sun.position.y;
+                    ray.position.z = sun.position.z;
+                    
+                    // Rotate rays to point outward
+                    ray.rotation.z = angle;
+                    ray.translateOnAxis(new THREE.Vector3(0, 1, 0), 6);
+                    
+                    // Store angle for animation
+                    ray.userData.angle = angle;
+                    ray.userData.distance = 6;
+                    
+                    this.sunrays.add(ray);
+                }
+                
+                // Create a glow effect
+                const glowGeometry = new THREE.SphereGeometry(6, 32, 32);
+                const glowMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffee00,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                
+                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                glow.position.copy(sun.position);
+                this.sunrays.add(glow);
+                
+                // For extreme bull market, add rainbow
+                if (intensity > 0.8) {
+                    this.createRainbow();
+                }
+            }
+            
+            // Create rainbow for extreme bull market
+            createRainbow() {
+                const radius = 30;
+                const tube = 0.5;
+                const radialSegments = 16;
+                const tubularSegments = 100;
+                const arc = Math.PI / 2;
+                
+                const rainbowGeometry = new THREE.TorusGeometry(
+                    radius, tube, radialSegments, tubularSegments, arc
+                );
+                
+                const rainbowMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                
+                // Create a rainbow with color gradient
+                const colors = [
+                    new THREE.Color(0xff0000), // red
+                    new THREE.Color(0xff7f00), // orange
+                    new THREE.Color(0xffff00), // yellow
+                    new THREE.Color(0x00ff00), // green
+                    new THREE.Color(0x0000ff), // blue
+                    new THREE.Color(0x4b0082), // indigo
+                    new THREE.Color(0x9400d3)  // violet
+                ];
+                
+                const positions = rainbowGeometry.attributes.position;
+                const vertexCount = positions.count;
+                
+                // Create color attribute
+                const rainbowColors = new Float32Array(vertexCount * 3);
+                
+                for (let i = 0; i < vertexCount; i++) {
+                    // Determine color index based on position in torus
+                    const x = positions.getX(i);
+                    const y = positions.getY(i);
+                    const z = positions.getZ(i);
+                    
+                    // Calculate angle for color mapping
+                    const angle = Math.atan2(y, x);
+                    const normalizedAngle = (angle + Math.PI) / (2 * Math.PI);
+                    
+                    // Get color from gradient
+                    const colorIndex = Math.floor(normalizedAngle * colors.length);
+                    const color = colors[Math.min(colorIndex, colors.length - 1)];
+                    
+                    rainbowColors[i * 3] = color.r;
+                    rainbowColors[i * 3 + 1] = color.g;
+                    rainbowColors[i * 3 + 2] = color.b;
+                }
+                
+                rainbowGeometry.setAttribute('color', new THREE.BufferAttribute(rainbowColors, 3));
+                
+                const rainbow = new THREE.Mesh(rainbowGeometry, rainbowMaterial);
+                rainbow.position.set(0, -5, -20);
+                rainbow.rotation.x = Math.PI / 2;
+                rainbow.rotation.z = Math.PI / 4;
+                
+                this.sunrays.add(rainbow);
+                
+                // For extreme bull market, add double rainbow
+                if (this.priceChangePercent > 15) {
+                    const rainbow2 = rainbow.clone();
+                    rainbow2.scale.set(1.2, 1.2, 1.2);
+                    rainbow2.material = rainbow.material.clone();
+                    rainbow2.material.opacity = 0.4;
+                    this.sunrays.add(rainbow2);
+                }
+            }
+            
+            // Create rain for rainy and stormy weather
+            createRain(intensity) {
+                const dropCount = Math.floor(intensity * 1000);
+                const rainDrops = new Float32Array(dropCount * 3);
+                const rainVelocities = new Float32Array(dropCount);
+                
+                for (let i = 0; i < dropCount; i++) {
+                    rainDrops[i * 3] = Math.random() * 60 - 30;     // x
+                    rainDrops[i * 3 + 1] = Math.random() * 30 + 10; // y
+                    rainDrops[i * 3 + 2] = Math.random() * 30 - 30; // z
+                    
+                    rainVelocities[i] = Math.random() * 0.2 + 0.1;
+                }
+                
+                const rainGeometry = new THREE.BufferGeometry();
+                rainGeometry.setAttribute('position', new THREE.BufferAttribute(rainDrops, 3));
+                
+                const rainMaterial = new THREE.PointsMaterial({
+                    color: 0x9db2e1,
+                    size: 0.2,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                
+                const rain = new THREE.Points(rainGeometry, rainMaterial);
+                rain.userData.velocities = rainVelocities;
+                
+                this.raindrops.add(rain);
+            }
+            
+            // Create lightning for stormy weather
+            createLightning() {
+                if (Math.random() > 0.98) {
+                    const startPoint = new THREE.Vector3(
+                        Math.random() * 40 - 20,
+                        20,
+                        Math.random() * 20 - 30
+                    );
+                    
+                    const points = [startPoint];
+                    let currentPoint = startPoint.clone();
+                    
+                    // Create zigzag lightning path
+                    const segments = Math.floor(Math.random() * 5) + 3;
+                    for (let i = 0; i < segments; i++) {
+                        const nextPoint = currentPoint.clone();
+                        nextPoint.x += (Math.random() - 0.5) * 4;
+                        nextPoint.y -= Math.random() * 5 + 2;
+                        nextPoint.z += (Math.random() - 0.5) * 4;
+                        
+                        points.push(nextPoint);
+                        currentPoint = nextPoint;
+                    }
+                    
+                    // Create lightning geometry
+                    const lightningGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const lightningMaterial = new THREE.LineBasicMaterial({
+                        color: 0xffff99,
+                        linewidth: 3
+                    });
+                    
+                    const lightning = new THREE.Line(lightningGeometry, lightningMaterial);
+                    lightning.userData.lifespan = 10; // Frames the lightning will exist
+                    
+                    this.lightnings.add(lightning);
+                    
+                    // Add a flash effect
+                    const flash = new THREE.PointLight(0xffff99, 1, 100);
+                    flash.position.copy(startPoint);
+                    flash.userData.lifespan = 5; // Frames the flash will exist
+                    
+                    this.lightnings.add(flash);
+                }
+            }
+            
+            // Update weather based on market data
+            updateWeather(marketData) {
+                const { priceChangePercent, volume, mempool } = marketData;
+                this.priceChangePercent = priceChangePercent;
+                
+                // Clear existing weather elements
+                while(this.clouds.children.length > 0) {
+                    this.clouds.remove(this.clouds.children[0]);
+                }
+                
+                while(this.raindrops.children.length > 0) {
+                    this.raindrops.remove(this.raindrops.children[0]);
+                }
+                
+                // Set wind intensity based on volume (0 to 1)
+                this.windIntensity = Math.min(volume / 10000000000, 1);
+                
+                // Set visibility based on mempool congestion (0 to 1)
+                this.visibilityFactor = Math.max(1 - (mempool / 50000), 0.3);
+                
+                // Determine weather state based on price change
+                let cloudCount = 0;
+                let weatherState = '';
+                let weatherDescription = '';
+                
+                if (priceChangePercent >= 20) {
+                    weatherState = 'extreme-bull';
+                    cloudCount = 5;
+                    this.createSun(1);
+                    weatherDescription = 'Ekstremalnie słoneczny dzień z podwójną tęczą! 🌈🌈☀️';
+                } 
+                else if (priceChangePercent >= 15) {
+                    weatherState = 'strong-bull';
+                    cloudCount = 8;
+                    this.createSun(0.9);
+                    weatherDescription = 'Bardzo słoneczny dzień z tęczą! 🌈☀️';
+                } 
+                else if (priceChangePercent >= 10) {
+                    weatherState = 'bull';
+                    cloudCount = 10;
+                    this.createSun(0.8);
+                    weatherDescription = 'Słoneczny dzień z pojedynczą tęczą 🌈';
+                } 
+                else if (priceChangePercent >= 5) {
+                    weatherState = 'mild-bull';
+                    cloudCount = 15;
+                    this.createSun(0.7);
+                    weatherDescription = 'Czyste, błękitne niebo ☀️';
+                } 
+                else if (priceChangePercent >= 2) {
+                    weatherState = 'slight-bull';
+                    cloudCount = 20;
+                    this.createSun(0.6);
+                    weatherDescription = 'Słonecznie z nielicznymi chmurami 🌤️';
+                } 
+                else if (priceChangePercent >= -2) {
+                    weatherState = 'stable';
+                    cloudCount = 25;
+                    this.createSun(0.5);
+                    weatherDescription = 'Częściowe zachmurzenie ⛅';
+                } 
+                else if (priceChangePercent >= -5) {
+                    weatherState = 'slight-bear';
+                    cloudCount = 30;
+                    weatherDescription = 'Przeważnie pochmurno 🌥️';
+                } 
+                else if (priceChangePercent >= -10) {
+                    weatherState = 'mild-bear';
+                    cloudCount = 35;
+                    this.createRain(0.3);
+                    weatherDescription = 'Lekki deszcz 🌧️';
+                } 
+                else if (priceChangePercent >= -15) {
+                    weatherState = 'bear';
+                    cloudCount = 40;
+                    this.createRain(0.6);
+                    weatherDescription = 'Intensywny deszcz 🌧️';
+                } 
+                else if (priceChangePercent >= -20) {
+                    weatherState = 'strong-bear';
+                    cloudCount = 45;
+                    this.createRain(0.8);
+                    weatherDescription = 'Burza z piorunami ⛈️';
+                } 
+                else {
+                    weatherState = 'extreme-bear';
+                    cloudCount = 50;
+                    this.createRain(1);
+                    weatherDescription = 'Gwałtowna nawałnica z gradem i piorunami ⛈️⚡';
+                }
+                
+                // Create clouds based on weather state
+                this.createClouds(cloudCount, weatherState);
+                
+                // Update weather description
+                this.weatherStatus.textContent = weatherDescription;
+                
+                // Update market state
+                this.marketState = weatherState;
+            }
+            
+            // Animation loop
+            animate() {
+                requestAnimationFrame(this.animate.bind(this));
+                
+                // Animate clouds (wind effect)
+                this.clouds.children.forEach(cloud => {
+                    cloud.position.x += cloud.userData.speed * this.windIntensity;
+                    
+                    // Reset position when cloud moves off screen
+                    if (cloud.position.x > 30) {
+                        cloud.position.x = -30;
+                    }
+                });
+                
+                // Animate rain
+                this.raindrops.children.forEach(rain => {
+                    const positions = rain.geometry.attributes.position;
+                    const velocities = rain.userData.velocities;
+                    
+                    for (let i = 0; i < positions.count; i++) {
+                        // Move raindrop down
+                        positions.setY(i, positions.getY(i) - velocities[i]);
+                        
+                        // Move raindrop horizontally based on wind
+                        positions.setX(i, positions.getX(i) + (velocities[i] * this.windIntensity * 0.2));
+                        
+                        // Reset position when raindrop reaches ground
+                        if (positions.getY(i) < -10) {
+                            positions.setY(i, 30);
+                            positions.setX(i, Math.random() * 60 - 30);
+                        }
+                    }
+                    
+                    positions.needsUpdate = true;
+                });
+                
+                // Animate sun rays
+                for (let i = 1; i < this.sunrays.children.length; i++) {
+                    const ray = this.sunrays.children[i];
+                    
+                    // Only animate actual rays, not the sun or glow
+                    if (ray.userData.angle !== undefined) {
+                        ray.userData.angle += 0.005;
+                        ray.rotation.z = ray.userData.angle;
+                    }
+                }
+                
+                // Animate lightning
+                this.lightnings.children.forEach(lightning => {
+                    lightning.userData.lifespan--;
+                    
+                    if (lightning.userData.lifespan <= 0) {
+                        this.lightnings.remove(lightning);
+                    }
+                });
+                
+                // Create new lightning for stormy weather
+                if (this.marketState === 'strong-bear' || this.marketState === 'extreme-bear') {
+                    this.createLightning();
+                }
+                
+                this.renderer.render(this.scene, this.camera);
+            }
+            
+            // Handle window resize
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            // Initialize weather on load with default values
+            initializeWeather() {
+                const defaultMarketData = {
+                    priceChangePercent: 0,
+                    volume: 5000000000,
+                    mempool: 10000
+                };
+                
+                this.updateWeather(defaultMarketData);
             }
         }
-
-        fetchBitcoinPrices();
-        setInterval(fetchBitcoinPrices, 20000); // Odświeżaj co 20 sekund
+        
+        // ============= BITCOIN DATA API HANDLERS =============
+        class BitcoinDataAPI {
+            constructor() {
+                // DOM elements to update
+                this.priceElement = document.getElementById('btc-price');
+                this.changeElement = document.getElementById('btc-change');
+                this.volumeElement = document.getElementById('btc-volume');
+                this.feeElement = document.getElementById('btc-fee');
+                this.hashrateElement = document.getElementById('btc-hashrate');
+                this.mempoolElement = document.getElementById('btc-mempool');
+                this.newsContainer = document.getElementById('news-container');
+                
+                // Bitcoin data storage
+                this.bitcoinData = {
+                    price: 0,
+                    priceChangePercent: 0,
+                    volume: 0,
+                    fee: 0,
+                    hashrate: 0,
+                    mempool: 0
+                };
+                
+                // Weather visualization
+                this.weatherViz = null;
+                
+                // API endpoints
+                this.endpoints = {
+                    price: 'https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false',
+                    network: 'https://api.blockchain.info/stats',
+                    mempool: 'https://mempool.space/api/v1/fees/recommended',
+                    news: 'https://api.cryptopanic.com/v1/posts/?auth_token=USE_YOUR_API_KEY&currencies=BTC'
+                };
+                
+                // Update intervals (milliseconds)
+                this.intervals = {
+                    price: 30000,    // 30 seconds
+                    network: 300000, // 5 minutes
+                    mempool: 60000,  // 1 minute
+                    news: 600000     // 10 minutes
+                };
+                
+                // Initialize data fetching
+                this.initData();
+            }
+            
+            // Initialize data fetching and set up the weather visualization
+            async initData() {
+                try {
+                    // Init weather visualization with default data
+                    this.weatherViz = new BitcoinWeather();
+                    
+                    // Initial data fetching
+                    await Promise.all([
+                        this.fetchPriceData(),
+                        this.fetchNetworkData(),
+                        this.fetchMempoolData(),
+                        this.fetchNewsData()
+                    ]);
+                    
+                    // Update weather with fetched data
+                    this.updateWeatherVisualization();
+                    
+                    // Set up regular updates
+                    this.setupIntervals();
+                } catch (error) {
+                    console.error('Error initializing data:', error);
+                }
+            }
+            
+            // Set up update intervals
+            setupIntervals() {
+                // Regular data updates
+                setInterval(() => this.fetchPriceData(), this.intervals.price);
+                setInterval(() => this.fetchNetworkData(), this.intervals.network);
+                setInterval(() => this.fetchMempoolData(), this.intervals.mempool);
+                setInterval(() => this.fetchNewsData(), this.intervals.news);
+            }
+            
+            // Fetch price data from CoinGecko
+            async fetchPriceData() {
+                try {
+                    // Simulate API response for demo purposes
+                    // In production, use actual API call:
+                    // const response = await fetch(this.endpoints.price);
+                    // const data = await response.json();
+                    
+                    // Simulate price data for demonstration
+                    const simulatedData = {
+                        market_data: {
+                            current_price: {
+                                usd: 38542 + (Math.random() * 1000 - 500)
+                            },
+                            price_change_percentage_24h: 5.2 + (Math.random() * 10 - 5),
+                            total_volume: {
+                                usd: 24156789342 + (Math.random() * 1000000000)
+                            }
+                        }
+                    };
+                    
+                    // Update stored data
+                    this.bitcoinData.price = simulatedData.market_data.current_price.usd;
+                    this.bitcoinData.priceChangePercent = simulatedData.market_data.price_change_percentage_24h;
+                    this.bitcoinData.volume = simulatedData.market_data.total_volume.usd;
+                    
+                    // Update UI
+                    this.priceElement.textContent = `$${this.formatNumber(this.bitcoinData.price)}`;
+                    
+                    // Set color based on price change
+                    const changeClass = this.bitcoinData.priceChangePercent >= 0 ? 'up' : 'down';
+                    const changeSign = this.bitcoinData.priceChangePercent >= 0 ? '+' : '';
+                    
+                    this.changeElement.textContent = `${changeSign}${this.bitcoinData.priceChangePercent.toFixed(2)}%`;
+                    this.changeElement.className = `price-change ${changeClass}`;
+                    
+                    this.volumeElement.textContent = `$${this.formatNumber(this.bitcoinData.volume, 0)}`;
+                    
+                    // Update weather after price data changes
+                    this.updateWeatherVisualization();
+                } catch (error) {
+                    console.error('Error fetching price data:', error);
+                }
+            }
+            
+            // Fetch network data from Blockchain.info
+            async fetchNetworkData() {
+                try {
+                    // Simulate API response for demo purposes
+                    // In production, use actual API call:
+                    // const response = await fetch(this.endpoints.network);
+                    // const data = await response.json();
+                    
+                    // Simulate network data for demonstration
+                    const simulatedData = {
+                        hash_rate: 285 + (Math.random() * 20 - 10),
+                        unconfirmed_count: 15000 + Math.floor(Math.random() * 10000)
+                    };
+                    
+                    // Update stored data
+                    this.bitcoinData.hashrate = simulatedData.hash_rate;
+                    this.bitcoinData.mempool = simulatedData.unconfirmed_count;
+                    
+                    // Update UI
+                    this.hashrateElement.textContent = `${this.bitcoinData.hashrate.toFixed(0)} EH/s`;
+                    this.mempoolElement.textContent = `${this.formatNumber(this.bitcoinData.mempool)} tx`;
+                    
+                    // Update weather after network data changes
+                    this.updateWeatherVisualization();
+                } catch (error) {
+                    console.error('Error fetching network data:', error);
+                }
+            }
+            
+            // Fetch mempool data from mempool.space
+            async fetchMempoolData() {
+                try {
+                    // Simulate API response for demo purposes
+                    // In production, use actual API call:
+                    // const response = await fetch(this.endpoints.mempool);
+                    // const data = await response.json();
+                    
+                    // Simulate mempool data for demonstration
+                    const simulatedData = {
+                        fastestFee: 20 + Math.floor(Math.random() * 10)
+                    };
+                    
+                    // Update stored data
+                    this.bitcoinData.fee = simulatedData.fastestFee;
+                    
+                    // Update UI
+                    const feeInUsd = (this.bitcoinData.fee * 250 * this.bitcoinData.price / 100000000).toFixed(2);
+                    this.feeElement.textContent = `${this.bitcoinData.fee} sat/vB ($${feeInUsd})`;
+                } catch (error) {
+                    console.error('Error fetching mempool data:', error);
+                }
+            }
+            
+            // Fetch news data from CryptoPanic
+            async fetchNewsData() {
+                try {
+                    // Simulate API response for demo purposes
+                    // In production, use actual API call with your API key:
+                    // const response = await fetch(this.endpoints.news);
+                    // const data = await response.json();
+                    
+                    // Simulate news data for demonstration
+                    const simulatedData = {
+                        results: [
+                            {
+                                title: "Bitcoin pobił nowy rekord hashrate'u sieci",
+                                source: {
+                                    title: "Bitcoin Magazine"
+                                },
+                                created_at: "2025-04-05T14:25:00Z",
+                                slug: "bitcoin-hashrate-record",
+                                domain: "bitcoinmagazine.com",
+                                votes: {
+                                    positive: 125,
+                                    negative: 5
+                                }
+                            },
+                            {
+                                title: "Wieloryb przeniósł 12,500 BTC - analiza transakcji",
+                                source: {
+                                    title: "Whale Alert"
+                                },
+                                created_at: "2025-04-05T10:15:00Z",
+                                slug: "whale-moves-btc",
+                                domain: "whalealert.io",
+                                votes: {
+                                    positive: 89,
+                                    negative: 3
+                                }
+                            },
+                            {
+                                title: "Nowa aktualizacja protokołu Bitcoin: co należy wiedzieć",
+                                source: {
+                                    title: "CoinDesk"
+                                },
+                                created_at: "2025-04-04T22:10:00Z",
+                                slug: "bitcoin-protocol-update",
+                                domain: "coindesk.com",
+                                votes: {
+                                    positive: 203,
+                                    negative: 12
+                                }
+                            },
+                            {
+                                title: "Lightning Network osiąga 50,000 aktywnych węzłów",
+                                source: {
+                                    title: "Bitcoin Lightning"
+                                },
+                                created_at: "2025-04-04T18:30:00Z",
+                                slug: "lightning-network-nodes",
+                                domain: "bitcoinlightning.com",
+                                votes: {
+                                    positive: 167,
+                                    negative: 8
+                                }
+                            },
+                            {
+                                title: "Duża instytucja finansowa dodaje Bitcoin do swojego portfela",
+                                source: {
+                                    title: "Bloomberg Crypto"
+                                },
+                                created_at: "2025-04-04T15:45:00Z",
+                                slug: "financial-institution-bitcoin",
+                                domain: "bloomberg.com",
+                                votes: {
+                                    positive: 310,
+                                    negative: 25
+                                }
+                            },
+                            {
+                                title: "Analiza techniczna: Bitcoin na krawędzi ważnego poziomu wsparcia",
+                                source: {
+                                    title: "Trading View"
+                                },
+                                created_at: "2025-04-04T12:20:00Z",
+                                slug: "bitcoin-technical-analysis",
+                                domain: "tradingview.com",
+                                votes: {
+                                    positive: 78,
+                                    negative: 42
+                                }
+                            }
+                        ]
+                    };
+                    
+                    // Update news container
+                    this.updateNewsUI(simulatedData.results);
+                } catch (error) {
+                    console.error('Error fetching news data:', error);
+                }
+            }
+            
+            // Update news UI with fetched data
+            updateNewsUI(newsItems) {
+                // Clear news container
+                this.newsContainer.innerHTML = '';
+                
+                // Add news items to container
+                newsItems.forEach(item => {
+                    const newsDate = new Date(item.created_at);
+                    const formattedDate = newsDate.toLocaleDateString('pl-PL', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    // Calculate sentiment score based on votes
+                    const totalVotes = item.votes.positive + item.votes.negative;
+                    const sentimentScore = totalVotes > 0 
+                        ? (item.votes.positive / totalVotes * 100).toFixed(0) 
+                        : 50;
+                    
+                    // Determine sentiment class
+                    let sentimentClass = 'neutral';
+                    if (sentimentScore > 70) sentimentClass = 'positive';
+                    if (sentimentScore < 30) sentimentClass = 'negative';
+                    
+                    const newsCard = document.createElement('div');
+                    newsCard.className = `news-card glassmorphism ${sentimentClass}`;
+                    
+                    newsCard.innerHTML = `
+                        <div class="news-source">${item.source.title} • ${item.domain}</div>
+                        <h3 class="news-card-title">${item.title}</h3>
+                        <div class="news-sentiment" style="margin-top: 8px; font-size: 0.8rem;">
+                            Sentyment: ${sentimentScore}% pozytywny
+                        </div>
+                        <span class="news-date">${formattedDate}</span>
+                    `;
+                    
+                    // Add click event to open news in new tab
+                    newsCard.style.cursor = 'pointer';
+                    newsCard.addEventListener('click', () => {
+                        window.open(`https://${item.domain}/${item.slug}`, '_blank');
+                    });
+                    
+                    this.newsContainer.appendChild(newsCard);
+                });
+            }
+            
+            // Update weather visualization with current Bitcoin data
+            updateWeatherVisualization() {
+                if (this.weatherViz && this.bitcoinData) {
+                    const weatherData = {
+                        priceChangePercent: this.bitcoinData.priceChangePercent,
+                        volume: this.bitcoinData.volume,
+                        mempool: this.bitcoinData.mempool
+                    };
+                    
+                    this.weatherViz.updateWeather(weatherData);
+                }
+            }
+            
+            // Format large numbers for display
+            formatNumber(number, decimals = 2) {
+                const lookup = [
+                    { value: 1, symbol: "" },
+                    { value: 1e3, symbol: "k" },
+                    { value: 1e6, symbol: "M" },
+                    { value: 1e9, symbol: "B" },
+                    { value: 1e12, symbol: "T" }
+                ];
+                
+                const rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
+                const item = lookup.slice().reverse().find(item => number >= item.value);
+                
+                return item
+                    ? (number / item.value).toFixed(decimals).replace(rx, "$1") + item.symbol
+                    : "0";
+            }
+        }
+        
+        // Initialize Bitcoin data and visualization on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const bitcoinData = new BitcoinDataAPI();
+        });
     </script>
 </body>
 </html>
