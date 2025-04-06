@@ -326,6 +326,62 @@
             animation: pulse 1.5s infinite ease-in-out;
         }
 
+        /* Error state styling */
+        .data-error {
+            color: var(--apple-danger) !important;
+            opacity: 0.8;
+        }
+
+        /* Data age indicator in cards */
+        .data-age {
+            font-size: 0.6rem;
+            color: var(--apple-text-secondary);
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        /* Tooltip styles */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: var(--apple-bg-dark);
+            color: var(--apple-text);
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(5px);
+        }
+
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--apple-bg-dark) transparent transparent transparent;
+        }
+
         /* Bitcoin icon animation */
         @keyframes rotate {
             0% { transform: rotateY(0deg); }
@@ -357,21 +413,29 @@
                 </div>
             </div>
             <div class="stats-cards">
-                <div class="stat-card glassmorphism">
+                <div class="stat-card glassmorphism tooltip">
                     <div class="stat-title">24h Wolumen</div>
                     <div class="stat-value" id="btc-volume">$0</div>
+                    <div class="data-age" id="volume-age"></div>
+                    <div class="tooltip-text">Całkowity wolumen obrotu Bitcoinem w ciągu ostatnich 24 godzin</div>
                 </div>
-                <div class="stat-card glassmorphism">
+                <div class="stat-card glassmorphism tooltip">
                     <div class="stat-title">Opłata transakcyjna</div>
                     <div class="stat-value" id="btc-fee">0 sat/vB</div>
+                    <div class="data-age" id="fee-age"></div>
+                    <div class="tooltip-text">Zalecana opłata za transakcję dla szybkiego potwierdzenia (w satoshi na bajt wirtualny)</div>
                 </div>
-                <div class="stat-card glassmorphism">
+                <div class="stat-card glassmorphism tooltip">
                     <div class="stat-title">Hash Rate</div>
                     <div class="stat-value" id="btc-hashrate">0 EH/s</div>
+                    <div class="data-age" id="hashrate-age"></div>
+                    <div class="tooltip-text">Całkowita moc obliczeniowa sieci Bitcoin (w ExaHash na sekundę)</div>
                 </div>
-                <div class="stat-card glassmorphism">
+                <div class="stat-card glassmorphism tooltip">
                     <div class="stat-title">Niepotwierdzonych</div>
                     <div class="stat-value" id="btc-mempool">0 tx</div>
+                    <div class="data-age" id="mempool-age"></div>
+                    <div class="tooltip-text">Liczba transakcji oczekujących na potwierdzenie w mempoolu</div>
                 </div>
             </div>
         </div>
@@ -970,19 +1034,110 @@
                     price: 'https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false',
                     network: 'https://api.blockchain.info/stats',
                     mempool: 'https://mempool.space/api/v1/fees/recommended',
-                    news: 'https://api.cryptopanic.com/v1/posts/?auth_token=USE_YOUR_API_KEY&currencies=BTC'
+                    news: 'https://api.cryptopanic.com/v1/posts/?currencies=BTC&kind=news'
                 };
                 
-                // Update intervals (milliseconds)
-                this.intervals = {
-                    price: 30000,    // 30 seconds
-                    network: 300000, // 5 minutes
-                    mempool: 60000,  // 1 minute
-                    news: 600000     // 10 minutes
+                // API rate limits information (requests per minute)
+                this.rateLimits = {
+                    coingecko: { limit: 10, remaining: 10, resetTime: Date.now() },
+                    blockchain: { limit: 10, remaining: 10, resetTime: Date.now() },
+                    mempool: { limit: 30, remaining: 30, resetTime: Date.now() }
                 };
+                
+                // Update intervals (milliseconds) - initial values, will be adjusted based on API responses
+                this.intervals = {
+                    price: 15000,    // 15 seconds initially
+                    network: 60000,  // 1 minute initially
+                    mempool: 30000,  // 30 seconds initially
+                    news: 300000     // 5 minutes initially
+                };
+                
+                // Keep track of last successful updates
+                this.lastSuccessfulUpdate = {
+                    price: null,
+                    network: null,
+                    mempool: null,
+                    news: null
+                };
+                
+                // Create a status indicator element in the UI
+                this.createStatusIndicator();
                 
                 // Initialize data fetching
                 this.initData();
+            }
+            
+            // Create status indicator in the header to show data freshness
+            createStatusIndicator() {
+                const headerContent = document.querySelector('.header-content');
+                
+                const statusElement = document.createElement('div');
+                statusElement.className = 'data-status';
+                statusElement.innerHTML = `
+                    <div class="status-indicator" title="Status odświeżania danych">
+                        <span class="status-dot loading"></span>
+                        <span class="status-text">Ładowanie danych...</span>
+                    </div>
+                `;
+                
+                headerContent.appendChild(statusElement);
+                
+                this.dataStatusElement = statusElement.querySelector('.status-text');
+                this.dataStatusDot = statusElement.querySelector('.status-dot');
+                
+                // Add CSS for status indicator
+                const style = document.createElement('style');
+                style.textContent = `
+                    .data-status {
+                        display: flex;
+                        align-items: center;
+                        margin-left: auto;
+                    }
+                    
+                    .status-indicator {
+                        display: flex;
+                        align-items: center;
+                        font-size: 0.75rem;
+                        color: var(--apple-text-secondary);
+                    }
+                    
+                    .status-dot {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        margin-right: 6px;
+                    }
+                    
+                    .status-dot.success {
+                        background-color: var(--apple-success);
+                    }
+                    
+                    .status-dot.error {
+                        background-color: var(--apple-danger);
+                    }
+                    
+                    .status-dot.loading {
+                        background-color: var(--bitcoin-orange);
+                        animation: pulse 1.5s infinite ease-in-out;
+                    }
+                    
+                    .data-error {
+                        color: var(--apple-danger);
+                    }
+                `;
+                
+                document.head.appendChild(style);
+            }
+            
+            // Update data status indicator
+            updateDataStatus(status, message) {
+                if (!this.dataStatusElement || !this.dataStatusDot) return;
+                
+                this.dataStatusElement.textContent = message;
+                
+                // Remove all classes and add the new one
+                this.dataStatusDot.classList.remove('success', 'error', 'loading');
+                this.dataStatusDot.classList.add(status);
             }
             
             // Initialize data fetching and set up the weather visualization
@@ -991,58 +1146,144 @@
                     // Init weather visualization with default data
                     this.weatherViz = new BitcoinWeather();
                     
+                    // Update status
+                    this.updateDataStatus('loading', 'Pobieranie danych...');
+                    
                     // Initial data fetching
-                    await Promise.all([
+                    const results = await Promise.allSettled([
                         this.fetchPriceData(),
                         this.fetchNetworkData(),
                         this.fetchMempoolData(),
                         this.fetchNewsData()
                     ]);
                     
-                    // Update weather with fetched data
-                    this.updateWeatherVisualization();
+                    // Check if any fetches were successful
+                    const anySuccess = results.some(result => result.status === 'fulfilled' && result.value === true);
+                    const allFailed = results.every(result => result.status === 'rejected' || result.value === false);
                     
-                    // Set up regular updates
-                    this.setupIntervals();
+                    if (allFailed) {
+                        // All data fetches failed
+                        this.updateDataStatus('error', 'Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
+                    } else if (anySuccess) {
+                        // At least some data was fetched successfully
+                        this.updateDataStatus('success', 'Dane zaktualizowano: ' + new Date().toLocaleTimeString());
+                        
+                        // Update weather with fetched data
+                        this.updateWeatherVisualization();
+                    }
+                    
+                    // Set up regular updates with adaptive intervals
+                    this.setupAdaptiveIntervals();
                 } catch (error) {
                     console.error('Error initializing data:', error);
+                    this.updateDataStatus('error', 'Błąd inicjalizacji danych');
                 }
             }
             
-            // Set up update intervals
-            setupIntervals() {
-                // Regular data updates
-                setInterval(() => this.fetchPriceData(), this.intervals.price);
-                setInterval(() => this.fetchNetworkData(), this.intervals.network);
-                setInterval(() => this.fetchMempoolData(), this.intervals.mempool);
-                setInterval(() => this.fetchNewsData(), this.intervals.news);
+            // Set up adaptive update intervals based on API rate limits
+            setupAdaptiveIntervals() {
+                // Function to schedule next update
+                const scheduleUpdate = (dataType, fetchFunction, minInterval) => {
+                    const interval = Math.max(minInterval, this.intervals[dataType]);
+                    
+                    setTimeout(async () => {
+                        const success = await fetchFunction.call(this);
+                        
+                        if (success) {
+                            this.lastSuccessfulUpdate[dataType] = Date.now();
+                            this.updateDataStatus('success', 'Dane zaktualizowano: ' + new Date().toLocaleTimeString());
+                        }
+                        
+                        // Reschedule with potentially adjusted interval
+                        scheduleUpdate(dataType, fetchFunction, minInterval);
+                    }, interval);
+                };
+                
+                // Start adaptive update cycles
+                scheduleUpdate('price', this.fetchPriceData, 10000);  // Minimum 10 seconds
+                scheduleUpdate('network', this.fetchNetworkData, 30000);  // Minimum 30 seconds
+                scheduleUpdate('mempool', this.fetchMempoolData, 20000);  // Minimum 20 seconds
+                scheduleUpdate('news', this.fetchNewsData, 120000);  // Minimum 2 minutes
+                
+                // Setup a regular check for stale data
+                setInterval(() => this.checkDataFreshness(), 30000);
+            }
+            
+            // Check if data is fresh and update status accordingly
+            checkDataFreshness() {
+                const now = Date.now();
+                
+                // Check if all data is stale (no successful updates in the last 5 minutes)
+                const allStale = Object.values(this.lastSuccessfulUpdate).every(
+                    timestamp => !timestamp || (now - timestamp > 5 * 60 * 1000)
+                );
+                
+                // Check if price data is stale (no successful updates in the last 2 minutes)
+                const priceStale = !this.lastSuccessfulUpdate.price || 
+                                   (now - this.lastSuccessfulUpdate.price > 2 * 60 * 1000);
+                
+                if (allStale) {
+                    this.updateDataStatus('error', 'Dane nieaktualne. Sprawdzanie połączenia...');
+                } else if (priceStale) {
+                    this.updateDataStatus('error', 'Cena Bitcoin może być nieaktualna');
+                }
+            }
+            
+            // Update API rate limit info from response headers
+            updateRateLimits(api, response) {
+                if (!response || !response.headers) return;
+                
+                // Different APIs provide rate limit info in different ways
+                if (api === 'coingecko') {
+                    const remaining = response.headers.get('X-RateLimit-Remaining');
+                    const resetSeconds = response.headers.get('X-RateLimit-Reset');
+                    
+                    if (remaining !== null) {
+                        this.rateLimits.coingecko.remaining = parseInt(remaining, 10);
+                    }
+                    
+                    if (resetSeconds !== null) {
+                        this.rateLimits.coingecko.resetTime = Date.now() + parseInt(resetSeconds, 10) * 1000;
+                        
+                        // Adjust interval based on rate limit
+                        if (this.rateLimits.coingecko.remaining < 3) {
+                            // If almost out of requests, slow down to once per minute
+                            this.intervals.price = 60000;
+                        } else if (this.rateLimits.coingecko.remaining > 30) {
+                            // If plenty of requests available, can go faster
+                            this.intervals.price = 15000;
+                        } else {
+                            // Otherwise use a middle ground
+                            this.intervals.price = 30000;
+                        }
+                    }
+                }
+                
+                // Similar handling can be added for other APIs if they provide rate limit headers
             }
             
             // Fetch price data from CoinGecko
             async fetchPriceData() {
                 try {
-                    // Simulate API response for demo purposes
-                    // In production, use actual API call:
-                    // const response = await fetch(this.endpoints.price);
-                    // const data = await response.json();
+                    // Show loading state
+                    this.priceElement.classList.add('loading');
+                    this.changeElement.classList.add('loading');
+                    this.volumeElement.classList.add('loading');
                     
-                    // Simulate price data for demonstration
-                    const simulatedData = {
-                        market_data: {
-                            current_price: {
-                                usd: 38542 + (Math.random() * 1000 - 500)
-                            },
-                            price_change_percentage_24h: 5.2 + (Math.random() * 10 - 5),
-                            total_volume: {
-                                usd: 24156789342 + (Math.random() * 1000000000)
-                            }
-                        }
-                    };
+                    // Real API call to CoinGecko
+                    const response = await fetch(this.endpoints.price);
+                    
+                    // Check if response is ok
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
                     
                     // Update stored data
-                    this.bitcoinData.price = simulatedData.market_data.current_price.usd;
-                    this.bitcoinData.priceChangePercent = simulatedData.market_data.price_change_percentage_24h;
-                    this.bitcoinData.volume = simulatedData.market_data.total_volume.usd;
+                    this.bitcoinData.price = data.market_data.current_price.usd;
+                    this.bitcoinData.priceChangePercent = data.market_data.price_change_percentage_24h;
+                    this.bitcoinData.volume = data.market_data.total_volume.usd;
                     
                     // Update UI
                     this.priceElement.textContent = `$${this.formatNumber(this.bitcoinData.price)}`;
@@ -1056,162 +1297,257 @@
                     
                     this.volumeElement.textContent = `$${this.formatNumber(this.bitcoinData.volume, 0)}`;
                     
+                    // Remove loading state
+                    this.priceElement.classList.remove('loading');
+                    this.changeElement.classList.remove('loading');
+                    this.volumeElement.classList.remove('loading');
+                    
                     // Update weather after price data changes
                     this.updateWeatherVisualization();
+                    
+                    // Adaptively adjust the next update time based on API rate limits
+                    // CoinGecko free tier has a limit of 10-50 calls per minute
+                    return true;
                 } catch (error) {
                     console.error('Error fetching price data:', error);
+                    
+                    // Show error state in UI
+                    this.priceElement.textContent = 'Dane niedostępne';
+                    this.changeElement.textContent = 'Brak danych';
+                    this.volumeElement.textContent = 'Brak danych';
+                    
+                    // Remove loading state
+                    this.priceElement.classList.remove('loading');
+                    this.changeElement.classList.remove('loading');
+                    this.volumeElement.classList.remove('loading');
+                    
+                    // Add error class
+                    this.priceElement.classList.add('data-error');
+                    this.changeElement.classList.add('data-error');
+                    this.volumeElement.classList.add('data-error');
+                    
+                    return false;
                 }
             }
             
             // Fetch network data from Blockchain.info
             async fetchNetworkData() {
                 try {
-                    // Simulate API response for demo purposes
-                    // In production, use actual API call:
-                    // const response = await fetch(this.endpoints.network);
-                    // const data = await response.json();
+                    // Show loading state
+                    this.hashrateElement.classList.add('loading');
                     
-                    // Simulate network data for demonstration
-                    const simulatedData = {
-                        hash_rate: 285 + (Math.random() * 20 - 10),
-                        unconfirmed_count: 15000 + Math.floor(Math.random() * 10000)
-                    };
+                    // Real API call to Blockchain.info
+                    const response = await fetch(this.endpoints.network);
+                    
+                    // Check if response is ok
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
                     
                     // Update stored data
-                    this.bitcoinData.hashrate = simulatedData.hash_rate;
-                    this.bitcoinData.mempool = simulatedData.unconfirmed_count;
+                    // Convert PH/s to EH/s (1 EH/s = 1000 PH/s)
+                    this.bitcoinData.hashrate = data.hash_rate / 1000;
                     
                     // Update UI
-                    this.hashrateElement.textContent = `${this.bitcoinData.hashrate.toFixed(0)} EH/s`;
-                    this.mempoolElement.textContent = `${this.formatNumber(this.bitcoinData.mempool)} tx`;
+                    this.hashrateElement.textContent = `${this.bitcoinData.hashrate.toFixed(1)} EH/s`;
                     
-                    // Update weather after network data changes
-                    this.updateWeatherVisualization();
+                    // Remove loading state
+                    this.hashrateElement.classList.remove('loading');
+                    this.hashrateElement.classList.remove('data-error');
+                    
+                    return true;
                 } catch (error) {
                     console.error('Error fetching network data:', error);
+                    
+                    // Show error state in UI
+                    this.hashrateElement.textContent = 'Brak danych';
+                    
+                    // Remove loading state
+                    this.hashrateElement.classList.remove('loading');
+                    
+                    // Add error class
+                    this.hashrateElement.classList.add('data-error');
+                    
+                    return false;
                 }
             }
             
             // Fetch mempool data from mempool.space
             async fetchMempoolData() {
                 try {
-                    // Simulate API response for demo purposes
-                    // In production, use actual API call:
-                    // const response = await fetch(this.endpoints.mempool);
-                    // const data = await response.json();
+                    // Show loading state
+                    this.feeElement.classList.add('loading');
+                    this.mempoolElement.classList.add('loading');
                     
-                    // Simulate mempool data for demonstration
-                    const simulatedData = {
-                        fastestFee: 20 + Math.floor(Math.random() * 10)
-                    };
+                    // Real API calls
+                    const [feeResponse, mempoolResponse] = await Promise.all([
+                        fetch(this.endpoints.mempool),
+                        fetch('https://mempool.space/api/mempool')
+                    ]);
+                    
+                    // Check if responses are ok
+                    if (!feeResponse.ok || !mempoolResponse.ok) {
+                        throw new Error(`HTTP error! Status: ${feeResponse.status} ${mempoolResponse.status}`);
+                    }
+                    
+                    const feeData = await feeResponse.json();
+                    const mempoolData = await mempoolResponse.json();
                     
                     // Update stored data
-                    this.bitcoinData.fee = simulatedData.fastestFee;
+                    this.bitcoinData.fee = feeData.fastestFee;
+                    this.bitcoinData.mempool = mempoolData.count || 0;
                     
-                    // Update UI
-                    const feeInUsd = (this.bitcoinData.fee * 250 * this.bitcoinData.price / 100000000).toFixed(2);
-                    this.feeElement.textContent = `${this.bitcoinData.fee} sat/vB ($${feeInUsd})`;
+                    // Update UI - only show USD conversion if price data is available
+                    if (this.bitcoinData.price) {
+                        const feeInUsd = (this.bitcoinData.fee * 250 * this.bitcoinData.price / 100000000).toFixed(2);
+                        this.feeElement.textContent = `${this.bitcoinData.fee} sat/vB ($${feeInUsd})`;
+                    } else {
+                        this.feeElement.textContent = `${this.bitcoinData.fee} sat/vB`;
+                    }
+                    
+                    this.mempoolElement.textContent = `${this.formatNumber(this.bitcoinData.mempool)} tx`;
+                    
+                    // Remove loading state
+                    this.feeElement.classList.remove('loading');
+                    this.mempoolElement.classList.remove('loading');
+                    this.feeElement.classList.remove('data-error');
+                    this.mempoolElement.classList.remove('data-error');
+                    
+                    // Update weather after mempool data changes
+                    this.updateWeatherVisualization();
+                    
+                    return true;
                 } catch (error) {
                     console.error('Error fetching mempool data:', error);
+                    
+                    // Show error state in UI
+                    this.feeElement.textContent = 'Brak danych';
+                    this.mempoolElement.textContent = 'Brak danych';
+                    
+                    // Remove loading state
+                    this.feeElement.classList.remove('loading');
+                    this.mempoolElement.classList.remove('loading');
+                    
+                    // Add error class
+                    this.feeElement.classList.add('data-error');
+                    this.mempoolElement.classList.add('data-error');
+                    
+                    return false;
                 }
             }
             
-            // Fetch news data from CryptoPanic
+            // Fetch news data using multiple sources for reliability
             async fetchNewsData() {
                 try {
-                    // Simulate API response for demo purposes
-                    // In production, use actual API call with your API key:
-                    // const response = await fetch(this.endpoints.news);
-                    // const data = await response.json();
+                    // Show loading state for news
+                    const newsCards = document.querySelectorAll('.news-card');
+                    newsCards.forEach(card => card.classList.add('loading'));
                     
-                    // Simulate news data for demonstration
-                    const simulatedData = {
-                        results: [
-                            {
-                                title: "Bitcoin pobił nowy rekord hashrate'u sieci",
-                                source: {
-                                    title: "Bitcoin Magazine"
-                                },
-                                created_at: "2025-04-05T14:25:00Z",
-                                slug: "bitcoin-hashrate-record",
-                                domain: "bitcoinmagazine.com",
-                                votes: {
-                                    positive: 125,
-                                    negative: 5
-                                }
-                            },
-                            {
-                                title: "Wieloryb przeniósł 12,500 BTC - analiza transakcji",
-                                source: {
-                                    title: "Whale Alert"
-                                },
-                                created_at: "2025-04-05T10:15:00Z",
-                                slug: "whale-moves-btc",
-                                domain: "whalealert.io",
-                                votes: {
-                                    positive: 89,
-                                    negative: 3
-                                }
-                            },
-                            {
-                                title: "Nowa aktualizacja protokołu Bitcoin: co należy wiedzieć",
-                                source: {
-                                    title: "CoinDesk"
-                                },
-                                created_at: "2025-04-04T22:10:00Z",
-                                slug: "bitcoin-protocol-update",
-                                domain: "coindesk.com",
-                                votes: {
-                                    positive: 203,
-                                    negative: 12
-                                }
-                            },
-                            {
-                                title: "Lightning Network osiąga 50,000 aktywnych węzłów",
-                                source: {
-                                    title: "Bitcoin Lightning"
-                                },
-                                created_at: "2025-04-04T18:30:00Z",
-                                slug: "lightning-network-nodes",
-                                domain: "bitcoinlightning.com",
-                                votes: {
-                                    positive: 167,
-                                    negative: 8
-                                }
-                            },
-                            {
-                                title: "Duża instytucja finansowa dodaje Bitcoin do swojego portfela",
-                                source: {
-                                    title: "Bloomberg Crypto"
-                                },
-                                created_at: "2025-04-04T15:45:00Z",
-                                slug: "financial-institution-bitcoin",
-                                domain: "bloomberg.com",
-                                votes: {
-                                    positive: 310,
-                                    negative: 25
-                                }
-                            },
-                            {
-                                title: "Analiza techniczna: Bitcoin na krawędzi ważnego poziomu wsparcia",
-                                source: {
-                                    title: "Trading View"
-                                },
-                                created_at: "2025-04-04T12:20:00Z",
-                                slug: "bitcoin-technical-analysis",
-                                domain: "tradingview.com",
-                                votes: {
-                                    positive: 78,
-                                    negative: 42
-                                }
+                    // Try multiple news sources for better reliability
+                    // 1. First try CryptoPanic API
+                    let newsData = null;
+                    let source = '';
+                    
+                    try {
+                        // If you have a CryptoPanic API key
+                        const cryptoPanicResponse = await fetch(this.endpoints.news);
+                        if (cryptoPanicResponse.ok) {
+                            const data = await cryptoPanicResponse.json();
+                            newsData = data.results;
+                            source = 'cryptopanic';
+                        }
+                    } catch (err) {
+                        console.warn('CryptoPanic API unavailable, trying alternative sources...');
+                    }
+                    
+                    // 2. If CryptoPanic failed, try CoinGecko news (status updates)
+                    if (!newsData) {
+                        try {
+                            const coinGeckoResponse = await fetch('https://api.coingecko.com/api/v3/status_updates?category=general&project_type=coin&per_page=10');
+                            if (coinGeckoResponse.ok) {
+                                const data = await coinGeckoResponse.json();
+                                newsData = data.status_updates.map(update => ({
+                                    title: update.description.split('.')[0],
+                                    source: {
+                                        title: update.project.name
+                                    },
+                                    created_at: update.created_at,
+                                    domain: 'coingecko.com',
+                                    slug: `status/${update.project.id}`,
+                                    votes: {
+                                        positive: 1,
+                                        negative: 0
+                                    }
+                                }));
+                                source = 'coingecko';
                             }
-                        ]
-                    };
+                        } catch (err) {
+                            console.warn('CoinGecko API unavailable, trying another source...');
+                        }
+                    }
                     
-                    // Update news container
-                    this.updateNewsUI(simulatedData.results);
+                    // 3. As a last resort, try to fetch from a Bitcoin RSS feed
+                    if (!newsData) {
+                        try {
+                            // We need a CORS proxy for RSS feeds, so in a real implementation
+                            // you would need a backend service or a CORS proxy
+                            // This is a placeholder for a real implementation
+                            const rssProxyUrl = 'https://your-backend-service.com/rss-proxy?url=https://bitcoinmagazine.com/feed';
+                            const rssResponse = await fetch(rssProxyUrl);
+                            if (rssResponse.ok) {
+                                const rssText = await rssResponse.text();
+                                const parser = new DOMParser();
+                                const xml = parser.parseFromString(rssText, "text/xml");
+                                const items = xml.querySelectorAll("item");
+                                
+                                newsData = Array.from(items).map(item => ({
+                                    title: item.querySelector("title").textContent,
+                                    source: {
+                                        title: "Bitcoin Magazine RSS"
+                                    },
+                                    created_at: new Date(item.querySelector("pubDate").textContent).toISOString(),
+                                    domain: "bitcoinmagazine.com",
+                                    slug: item.querySelector("link").textContent.split('bitcoinmagazine.com/')[1],
+                                    votes: {
+                                        positive: 1,
+                                        negative: 0
+                                    }
+                                }));
+                                source = 'rss';
+                            }
+                        } catch (err) {
+                            console.warn('RSS feed unavailable');
+                        }
+                    }
+                    
+                    // If we have news data from any source, update the UI
+                    if (newsData && newsData.length > 0) {
+                        console.log(`News data fetched successfully from ${source}`);
+                        this.updateNewsUI(newsData);
+                        return true;
+                    } else {
+                        throw new Error('No news data available from any source');
+                    }
                 } catch (error) {
                     console.error('Error fetching news data:', error);
+                    
+                    // Show error state in news container
+                    this.newsContainer.innerHTML = '';
+                    
+                    const errorCard = document.createElement('div');
+                    errorCard.className = 'news-card glassmorphism';
+                    errorCard.innerHTML = `
+                        <h3 class="news-card-title">Nie udało się pobrać wiadomości</h3>
+                        <p class="news-card-description">
+                            Aktualnie występują problemy z dostępem do źródeł wiadomości.
+                            Spróbuj odświeżyć stronę za kilka minut.
+                        </p>
+                    `;
+                    
+                    this.newsContainer.appendChild(errorCard);
+                    return false;
                 }
             }
             
@@ -1279,6 +1615,10 @@
             
             // Format large numbers for display
             formatNumber(number, decimals = 2) {
+                if (number === undefined || number === null) {
+                    return "N/A";
+                }
+                
                 const lookup = [
                     { value: 1, symbol: "" },
                     { value: 1e3, symbol: "k" },
@@ -1294,12 +1634,88 @@
                     ? (number / item.value).toFixed(decimals).replace(rx, "$1") + item.symbol
                     : "0";
             }
+            
+            // Format time ago for data age indicators
+            formatTimeAgo(timestamp) {
+                if (!timestamp) return "";
+                
+                const now = Date.now();
+                const secondsAgo = Math.floor((now - timestamp) / 1000);
+                
+                if (secondsAgo < 5) return "teraz";
+                if (secondsAgo < 60) return `${secondsAgo} sek. temu`;
+                
+                const minutesAgo = Math.floor(secondsAgo / 60);
+                if (minutesAgo < 60) return `${minutesAgo} min. temu`;
+                
+                const hoursAgo = Math.floor(minutesAgo / 60);
+                if (hoursAgo < 24) return `${hoursAgo} godz. temu`;
+                
+                const daysAgo = Math.floor(hoursAgo / 24);
+                return `${daysAgo} dni temu`;
+            }
+            
+            // Update the data age indicators
+            updateDataAgeIndicators() {
+                const volumeAgeElement = document.getElementById('volume-age');
+                const feeAgeElement = document.getElementById('fee-age');
+                const hashrateAgeElement = document.getElementById('hashrate-age');
+                const mempoolAgeElement = document.getElementById('mempool-age');
+                
+                if (volumeAgeElement && this.lastSuccessfulUpdate.price) {
+                    volumeAgeElement.textContent = this.formatTimeAgo(this.lastSuccessfulUpdate.price);
+                }
+                
+                if (hashrateAgeElement && this.lastSuccessfulUpdate.network) {
+                    hashrateAgeElement.textContent = this.formatTimeAgo(this.lastSuccessfulUpdate.network);
+                }
+                
+                if (feeAgeElement && mempoolAgeElement && this.lastSuccessfulUpdate.mempool) {
+                    const age = this.formatTimeAgo(this.lastSuccessfulUpdate.mempool);
+                    feeAgeElement.textContent = age;
+                    mempoolAgeElement.textContent = age;
+                }
+                
+                // Schedule the next update
+                setTimeout(() => this.updateDataAgeIndicators(), 10000); // Update every 10 seconds
+            }
         }
         
+        // Error handling for failed API requests
+        window.addEventListener('error', function(event) {
+            console.error('Global error handler:', event.error);
+            // Could implement more sophisticated error tracking or reporting here
+        });
+
         // Initialize Bitcoin data and visualization on page load
         document.addEventListener('DOMContentLoaded', () => {
             const bitcoinData = new BitcoinDataAPI();
+            
+            // Add connection status monitoring
+            window.addEventListener('online', function() {
+                console.log('Connection restored. Refreshing data...');
+                bitcoinData.updateDataStatus('loading', 'Połączenie przywrócone. Odświeżanie...');
+                
+                // Force refresh all data
+                setTimeout(() => {
+                    Promise.all([
+                        bitcoinData.fetchPriceData(),
+                        bitcoinData.fetchNetworkData(),
+                        bitcoinData.fetchMempoolData()
+                    ]);
+                }, 1000);
+            });
+            
+            window.addEventListener('offline', function() {
+                console.log('Connection lost');
+                bitcoinData.updateDataStatus('error', 'Brak połączenia z internetem');
+            });
+            
+            // Start updating data age indicators
+            bitcoinData.updateDataAgeIndicators();
         });
     </script>
+</body>
+</html>
 </body>
 </html>
